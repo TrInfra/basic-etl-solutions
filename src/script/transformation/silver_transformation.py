@@ -1,11 +1,23 @@
 import pandas as pd
 import json
+from minio import Minio
+import io
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
+
+client = Minio(
+    os.getenv("MINIO_ENDPOINT"),
+    access_key=os.getenv("MINIO_ACCESS_KEY"),
+    secret_key=os.getenv("MINIO_SECRET_KEY"),
+    secure=False
+)
 # Lendo o arquivo bronze
-with open("../extract/sampledata/products.json", "r") as f:
-    products = json.load(f)
+response = client.get_object("data-lake", "bronze/products.json")
+products = json.loads(response.read())
 
-# Transformando em DataFrame PRODUTOS
+# Transformando em DataFrame com pandas PRODUTOS
 df = pd.DataFrame(products)
 
 print(df.head())
@@ -24,12 +36,21 @@ print(df.head())
 print(df.columns)
 
 # Salvando o arquivo silver
-df.to_csv("../extract/sampledata/products_silver.csv", index=False)
-print("Products silver salvo!")
+csv_buffer = io.BytesIO()
+df.to_csv(csv_buffer, index=False)
+csv_buffer.seek(0)
+client.put_object(
+    "data-lake",
+    "silver/products_silver.csv",
+    csv_buffer,
+    length=csv_buffer.getbuffer().nbytes,
+    content_type="application/csv"
+)
+print("Products silver enviado para o MinIO!")
 
 # Lendo o arquivo bronze de USERS
-with open("../extract/sampledata/users.json", "r") as f:
-    users = json.load(f)
+response = client.get_object("data-lake", "bronze/users.json")
+users = json.loads(response.read())
 
 # Transformando em DataFrame USERS
 df = pd.DataFrame(users)
@@ -48,15 +69,24 @@ df['zipcode'] = df['address'].apply(lambda x: x['zipcode'])
 df = df.drop(columns=['name', 'address', 'password', '__v'])
 
 # Salvando
-df.to_csv("../extract/sampledata/users_silver.csv", index=False)
-print("Users silver salvo!")
+csv_buffer = io.BytesIO()
+df.to_csv(csv_buffer, index=False)
+csv_buffer.seek(0)
+client.put_object(
+    "data-lake",
+    "silver/users_silver.csv",
+    csv_buffer,
+    length=csv_buffer.getbuffer().nbytes,
+    content_type="application/csv"
+)
+print("Users silver enviado para o MinIO!")
 
 
 
 #-------------------------------------------------------------
 # Lendo o arquivo bronze
-with open("../extract/sampledata/carts.json", "r") as f:
-    carts = json.load(f)
+response = client.get_object("data-lake", "bronze/carts.json")
+carts = json.loads(response.read())
 
 
 df = pd.DataFrame(carts)
@@ -75,7 +105,16 @@ print(df.head())
 print(df.columns)
 
 # Salvando o arquivo silver
-df.to_csv("../extract/sampledata/carts_silver.csv", index=False)
-print("Products silver salvo!")
+csv_buffer = io.BytesIO()
+df.to_csv(csv_buffer, index=False)
+csv_buffer.seek(0)
+client.put_object(
+    "data-lake",
+    "silver/carts_silver.csv",
+    csv_buffer,
+    length=csv_buffer.getbuffer().nbytes,
+    content_type="application/csv"
+)
+print("Carts silver enviado para o MinIO!")
 
 
