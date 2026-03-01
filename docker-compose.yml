@@ -1,0 +1,57 @@
+services:
+  rabbitmq:
+    build:
+      context: ./infra/rabbitmq
+      dockerfile: dockerfile
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - etl-network
+
+  minio:
+    build:
+      context: ./infra/minio
+      dockerfile: dockerfile
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: 12345678
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - etl-network
+
+  airflow:
+    build:
+      context: ./infra/airflow
+      dockerfile: dockerfile
+    container_name: airflow
+    environment:
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./orchestration/airflow/dags:/opt/airflow/dags
+      - ./orchestration/airflow/variables:/opt/airflow/variables
+      - airflow_logs:/opt/airflow/logs
+    networks:
+      - etl-network
+
+volumes:
+  minio_data:
+  airflow_logs:
+
+networks:
+  etl-network:
+    driver: bridge
