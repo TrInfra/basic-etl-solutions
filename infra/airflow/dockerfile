@@ -1,0 +1,28 @@
+FROM apache/airflow:2.11.0-python3.12
+
+USER airflow
+
+ARG AIRFLOW_VERSION=2.11.0
+ARG PYTHON_VERSION=3.12
+ARG CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+
+# Pacotes no ambiente do Airflow (com constraints)
+RUN pip install --no-cache-dir --constraint "${CONSTRAINT_URL}" pika
+
+
+
+# dbt em ambiente isolado (sem constraints do Airflow)
+RUN python -m venv /opt/airflow/dbt_venv && \
+    /opt/airflow/dbt_venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/airflow/dbt_venv/bin/pip install --no-cache-dir \
+    dbt-core \
+    dbt-postgres
+
+ENV AIRFLOW_HOME=/opt/airflow
+ENV PATH="/opt/airflow/dbt_venv/bin:${PATH}"
+
+RUN mkdir -p ${AIRFLOW_HOME}/dags ${AIRFLOW_HOME}/logs ${AIRFLOW_HOME}/plugins
+
+EXPOSE 8080
+
+CMD ["airflow", "standalone"]
