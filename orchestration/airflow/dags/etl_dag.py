@@ -1,0 +1,79 @@
+from datetime import datetime, timedelta
+
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.operators.dummy import DummyOperator
+
+from alerting.consumer.airflow_callback import airflow_task_failure_callback, airflow_pipeline_success_callback
+from src.script.extract.extraction import extract_products, extract_users, extract_carts
+from src.script.transformation.silver_transformation import transform_products, transform_users, transform_carts
+
+
+
+def run_extractions(**kwargs) -> None:
+    extract_products(**kwargs)
+    extract_users(**kwargs)
+    extract_carts(**kwargs)
+
+
+def run_transformations(**kwargs) -> None:
+    transform_products(**kwargs)
+    transform_users(**kwargs)
+    transform_carts(**kwargs)
+
+
+def alert_on_completion(**kwargs):
+    if kwargs['task_instance'].state == 'success':
+        airflow_pipeline_success_callback(**kwargs)
+    else:
+        airflow_task_failure_callback(**kwargs)
+
+
+default_args = {
+    "owner": "airflow",
+    "retries": 1,
+    "retry_delay": timedelta(minutes=5),
+    "start_date": datetime(2026, 3, 1),
+    "on_failure_callback": airflow_task_failure_callback,
+    "on_success_callback": airflow_pipeline_success_callback,
+}
+
+with DAG(
+    dag_id="etl_pipeline",
+    description="ETL: FakeStore API → Bronze → Silver → Gold (dbt)",
+    default_args=default_args,
+    start_date=datetime(2026, 3, 1),
+    schedule="@daily",
+    catchup=False,
+    tags=["etl", "fakestore"],
+) as dag:
+
+    start_dag = DummyOperator(task_id="start_dag")
+    
+    t_extract = PythonOperator(
+        task_id="extract_all",
+        python_callable=run_extractions,
+    )
+
+    # ── Transform ────────────────────────────────────────────
+    t_transform = PythonOperator(
+        task_id="transform_all",
+        python_callable=run_transformations,
+    )
+    
+
+    alert_task = PythonOperator(
+        task_id="alert_on_completion",
+        python_callable=alert_on_completion,
+        trigger_rule="all_done",
+    )
+    end_dag = DummyOperator(task_id="end_dag")
+    
+    # ── Gold (dbt) - será configurado depois ─────────────────
+    # t_dbt_run = BashOperator(
+    #     task_id="dbt_run",
+    #     bash_command="dbt run --project-dir /opt/airflow/dbt",
+    # )
+
+    # ── Dependências ─────────────────────────────────────────
+    start_dag >> t_extract >> t_transform >> alert_task >> end_dag
