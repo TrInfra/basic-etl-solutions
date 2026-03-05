@@ -1,42 +1,52 @@
-import requests as r
-import json
 import io
+import json
 import os
+
+import requests
 from minio import Minio
-from dotenv import load_dotenv
 
-# Conectando no MinIO
-load_dotenv()
 
-client = Minio(
-    os.getenv("MINIO_ENDPOINT"),
-    access_key=os.getenv("MINIO_ACCESS_KEY"),
-    secret_key=os.getenv("MINIO_SECRET_KEY"),
-    secure=False
-)
-def upload_to_minio(data, filename):
-    data_bytes = json.dumps(data).encode('utf-8')
+def get_minio_client() -> Minio:
+    return Minio(
+        os.getenv("MINIO_ENDPOINT", "minio:9000"),
+        access_key=os.getenv("MINIO_ACCESS_KEY", "admin"),
+        secret_key=os.getenv("MINIO_SECRET_KEY", "12345678"),
+        secure=False,
+    )
+
+
+def _upload_to_bronze(client: Minio, data: list, filename: str) -> None:
+    bucket = "data-lake"
+    if not client.bucket_exists(bucket):
+        client.make_bucket(bucket)
+
+    data_bytes = json.dumps(data).encode("utf-8")
     client.put_object(
-        "data-lake",
+        bucket,
         f"bronze/{filename}",
         io.BytesIO(data_bytes),
         length=len(data_bytes),
-        content_type="application/json"
+        content_type="application/json",
     )
-    print(f"{filename} enviado para o bronze!")
-
-#produtos para sampledata/products.json
-response = r.get('https://fakestoreapi.com/products')
-products = response.json()
-upload_to_minio(products, "products.json")
+    print(f"[extract] {filename} enviado para bronze!")
 
 
-# Usuários para sampledata/usuarios.json
-response = r.get('https://fakestoreapi.com/users')
-users = response.json()
-upload_to_minio(users, "users.json")
+def extract_products(**kwargs) -> None:
+    client = get_minio_client()
+    response = requests.get("https://fakestoreapi.com/products", timeout=30)
+    response.raise_for_status()
+    _upload_to_bronze(client, response.json(), "products.json")
 
-# Carrinhos para sampledata/carrinho.json
-response = r.get('https://fakestoreapi.com/carts')
-carts = response.json()
-upload_to_minio(carts, "carts.json")
+
+def extract_users(**kwargs) -> None:
+    client = get_minio_client()
+    response = requests.get("https://fakestoreapi.com/users", timeout=30)
+    response.raise_for_status()
+    _upload_to_bronze(client, response.json(), "users.json")
+
+
+def extract_carts(**kwargs) -> None:
+    client = get_minio_client()
+    response = requests.get("https://fakestoreapi.com/carts", timeout=30)
+    response.raise_for_status()
+    _upload_to_bronze(client, response.json(), "carts.json")

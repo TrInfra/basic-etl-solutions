@@ -1,5 +1,6 @@
 services:
   rabbitmq:
+    mem_limit: 512m
     build:
       context: ./infra/rabbitmq
       dockerfile: dockerfile
@@ -11,26 +12,40 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
     networks:
       - etl-network
 
   minio:
+    mem_limit: 512m
     build:
       context: ./infra/minio
       dockerfile: dockerfile
     container_name: minio
     environment:
       MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: 12345678
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     networks:
       - etl-network
 
   airflow:
+    mem_limit: 1g
     build:
       context: ./infra/airflow
       dockerfile: dockerfile
@@ -39,16 +54,85 @@ services:
       AIRFLOW_HOME: /opt/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      _AIRFLOW_WWW_USER_FIRSTNAME: Admin
+      _AIRFLOW_WWW_USER_LASTNAME: User
+      _AIRFLOW_WWW_USER_EMAIL: admin@example.com
+      PYTHONPATH: /opt/airflow
+      # RabbitMQ
+      ALERT_RMQ_HOST: rabbitmq
+      ALERT_RMQ_PORT: "5672"
+      ALERT_RMQ_USER: admin
+      ALERT_RMQ_PASS: admin
+      ALERT_RMQ_VHOST: /
+      ALERT_EXCHANGE: alerts.exchange
+      ALERT_QUEUE: alerts.email
+      ALERT_ROUTING_KEY: alerts.email
+      # SMTP
+      ALERT_SMTP_HOST: smtp.gmail.com
+      ALERT_SMTP_PORT: "587"
+      ALERT_SMTP_TLS: "true"
+      ALERT_SMTP_USER: ${ALERT_SMTP_USER}
+      ALERT_SMTP_PASS: ${ALERT_SMTP_PASS}
+      ALERT_FROM_EMAIL: ${ALERT_FROM_EMAIL}
+      ALERT_TO_EMAIL: ${ALERT_TO_EMAIL}
     ports:
       - "8080:8080"
     volumes:
+      - ./src:/opt/airflow/src
       - ./orchestration/airflow/dags:/opt/airflow/dags
       - ./orchestration/airflow/variables:/opt/airflow/variables
+      - ./alerting:/opt/airflow/alerting
       - airflow_logs:/opt/airflow/logs
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks:
+      - etl-network
+
+  alert-consumer:
+    mem_limit: 256m
+    build:
+      context: ./infra/alert-consumer
+      dockerfile: dockerfile
+    container_name: alert-consumer
+    command: python /opt/airflow/alerting/notifier/alert_consumer.py
+    environment:
+      PYTHONPATH: /opt/airflow
+      ALERT_RMQ_HOST: rabbitmq
+      ALERT_RMQ_PORT: "5672"
+      ALERT_RMQ_USER: admin
+      ALERT_RMQ_PASS: admin
+      ALERT_RMQ_VHOST: /
+      ALERT_EXCHANGE: alerts.exchange
+      ALERT_QUEUE: alerts.email
+      ALERT_ROUTING_KEY: alerts.email
+      ALERT_SMTP_HOST: smtp.gmail.com
+      ALERT_SMTP_PORT: "587"
+      ALERT_SMTP_TLS: "true"
+      ALERT_SMTP_USER: ${ALERT_SMTP_USER}
+      ALERT_SMTP_PASS: ${ALERT_SMTP_PASS}
+      ALERT_FROM_EMAIL: ${ALERT_FROM_EMAIL}
+      ALERT_TO_EMAIL: ${ALERT_TO_EMAIL}
+    volumes:
+      - ./alerting:/opt/airflow/alerting
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     networks:
       - etl-network
 
 volumes:
+  rabbitmq_data:
   minio_data:
   airflow_logs:
 

@@ -1,0 +1,9 @@
+FROM python:3.12-slim
+
+WORKDIR /opt/airflow
+
+RUN pip install --no-cache-dir pika
+
+ENV PYTHONPATH=/opt/airflow
+
+CMD ["python", "/opt/airflow/alerting/notifier/alert_consumer.py"]
