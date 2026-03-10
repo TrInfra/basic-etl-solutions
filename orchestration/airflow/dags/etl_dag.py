@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta
-
+import os
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
+from airflow.operators.bash import BashOperator
 
 from alerting.consumer.airflow_callback import airflow_task_failure_callback, airflow_pipeline_success_callback
 from src.script.extract.extraction import extract_products, extract_users, extract_carts
 from src.script.transformation.silver_transformation import transform_products, transform_users, transform_carts
-
 
 
 def run_extractions(**kwargs) -> None:
@@ -23,10 +23,16 @@ def run_transformations(**kwargs) -> None:
 
 
 def alert_on_completion(**kwargs):
-    if kwargs['task_instance'].state == 'success':
-        airflow_pipeline_success_callback(**kwargs)
+    dag_run = kwargs['dag_run']
+    
+    failed_tasks = dag_run.get_task_instances(state='failed')
+
+    if len(failed_tasks) == 0:
+        print("Sucesso: Nenhuma falha detectada. Enviando alerta de sucesso...")
+        return airflow_pipeline_success_callback(**kwargs)
     else:
-        airflow_task_failure_callback(**kwargs)
+        print(f"Falha: Detectadas {len(failed_tasks)} tarefas com erro. Enviando alerta de falha...")
+        return airflow_task_failure_callback(**kwargs)
 
 
 default_args = {
@@ -60,20 +66,26 @@ with DAG(
         task_id="transform_all",
         python_callable=run_transformations,
     )
-    
 
     alert_task = PythonOperator(
         task_id="alert_on_completion",
         python_callable=alert_on_completion,
         trigger_rule="all_done",
+        provide_context=True
     )
+    
     end_dag = DummyOperator(task_id="end_dag")
     
-    # ── Gold (dbt) - será configurado depois ─────────────────
-    # t_dbt_run = BashOperator(
-    #     task_id="dbt_run",
-    #     bash_command="dbt run --project-dir /opt/airflow/dbt",
-    # )
+    # ── Gold (dbt) ───────────────────────────────────────────
+    t_dbt_gold = BashOperator(
+        task_id="run_dbt_gold",
+        bash_command="cd /opt/airflow/dbt && dbt run --profiles-dir .",
+        env={
+            **os.environ, 
+            "MINIO_ACCESS_KEY": os.getenv("MINIO_ACCESS_KEY", "admin"),
+            "MINIO_SECRET_KEY": os.getenv("MINIO_SECRET_KEY", "12345678"),
+        }
+    )
 
     # ── Dependências ─────────────────────────────────────────
-    start_dag >> t_extract >> t_transform >> alert_task >> end_dag
+    start_dag >> t_extract >> t_transform >> t_dbt_gold >> alert_task >> end_dag
