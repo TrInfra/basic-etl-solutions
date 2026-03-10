@@ -45,11 +45,12 @@ services:
       - etl-network
 
   airflow:
-    mem_limit: 1g
+    mem_limit: 2g
     build:
       context: ./infra/airflow
       dockerfile: dockerfile
     container_name: airflow
+                             
     environment:
       AIRFLOW_HOME: /opt/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
@@ -86,6 +87,8 @@ services:
       - ./orchestration/airflow/variables:/opt/airflow/variables
       - ./alerting:/opt/airflow/alerting
       - airflow_logs:/opt/airflow/logs
+      - ./dbt:/opt/airflow/dbt
+      
     depends_on:
       rabbitmq:
         condition: service_healthy
