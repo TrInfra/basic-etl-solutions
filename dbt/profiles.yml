@@ -1,0 +1,15 @@
+basic_etl_project:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/duckdb.db
+      extensions:
+        - httpfs
+        - parquet
+      settings:
+        s3_endpoint: minio:9000
+        s3_access_key_id: "{{ env_var('MINIO_ACCESS_KEY')}}"
+        s3_secret_access_key: "{{ env_var('MINIO_SECRET_KEY')}}"
+        s3_use_ssl: false
+        s3_url_style: path

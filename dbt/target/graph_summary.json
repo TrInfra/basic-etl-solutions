@@ -1,0 +1,1 @@
+{"_invocation_id": "7b5909d3-e560-4d66-b434-7746d4c4737b", "linked": {"0": {"name": "model.basic_etl_project.gold_resume_carts", "type": "model"}, "1": {"name": "model.basic_etl_project.gold_resume_products", "type": "model"}, "2": {"name": "model.basic_etl_project.gold_resume_users", "type": "model"}}}
