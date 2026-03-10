@@ -4,6 +4,11 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.bash import BashOperator
+from airflow.utils.session import create_session
+from airflow.models import TaskInstance
+from airflow.utils.state import State
+from airflow.models import DagBag
+
 
 from alerting.consumer.airflow_callback import airflow_task_failure_callback, airflow_pipeline_success_callback
 from src.script.extract.extraction import extract_products, extract_users, extract_carts
@@ -40,8 +45,6 @@ default_args = {
     "retries": 1,
     "retry_delay": timedelta(minutes=5),
     "start_date": datetime(2026, 3, 1),
-    "on_failure_callback": airflow_task_failure_callback,
-    "on_success_callback": airflow_pipeline_success_callback,
 }
 
 with DAG(
@@ -61,7 +64,6 @@ with DAG(
         python_callable=run_extractions,
     )
 
-    # ── Transform ────────────────────────────────────────────
     t_transform = PythonOperator(
         task_id="transform_all",
         python_callable=run_transformations,
