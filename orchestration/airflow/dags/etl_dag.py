@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
-
+import os
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
+from airflow.operators.bash import BashOperator
 from airflow.utils.session import create_session
 from airflow.models import TaskInstance
 from airflow.utils.state import State
@@ -27,33 +28,16 @@ def run_transformations(**kwargs) -> None:
 
 
 def alert_on_completion(**kwargs):
-    ti = kwargs.get('task_instance') or kwargs.get('ti')
-    dag_run = kwargs.get('dag_run')
-    dag_id = getattr(dag_run, "dag_id", None)
-    run_id = getattr(dag_run, "run_id", None)
+    dag_run = kwargs['dag_run']
+    
+    failed_tasks = dag_run.get_task_instances(state='failed')
 
-    dag_bag = DagBag()
-    dag_obj = dag_bag.get_dag(dag_id)
-    task_obj = dag_obj.get_task('alert_on_completion')
-
-    upstream_task_ids = {t.task_id for t in task_obj.get_direct_relatives(upstream=True)}
-
-    with create_session() as session:
-        tis = session.query(TaskInstance).filter(
-            TaskInstance.dag_id == dag_id,
-            TaskInstance.run_id == run_id,
-            TaskInstance.task_id.in_(upstream_task_ids)  # Filtra apenas upstream
-        ).all()
-
-    states = {t.task_id: t.state for t in tis}
-    print(f"[DEBUG] Upstream task states: {states}")
-    all_success = all(s == State.SUCCESS for s in states.values())
-
-    print(f"[DEBUG] All upstream success: {all_success}")
-    if all_success:
-        airflow_pipeline_success_callback(**kwargs)
+    if len(failed_tasks) == 0:
+        print("Sucesso: Nenhuma falha detectada. Enviando alerta de sucesso...")
+        return airflow_pipeline_success_callback(**kwargs)
     else:
-        airflow_task_failure_callback(**kwargs)
+        print(f"Falha: Detectadas {len(failed_tasks)} tarefas com erro. Enviando alerta de falha...")
+        return airflow_task_failure_callback(**kwargs)
 
 
 default_args = {
@@ -84,20 +68,26 @@ with DAG(
         task_id="transform_all",
         python_callable=run_transformations,
     )
-    
 
     alert_task = PythonOperator(
         task_id="alert_on_completion",
         python_callable=alert_on_completion,
         trigger_rule="all_done",
+        provide_context=True
     )
+    
     end_dag = DummyOperator(task_id="end_dag")
     
-    # ── Gold (dbt) - será configurado depois ─────────────────
-    # t_dbt_run = BashOperator(
-    #     task_id="dbt_run",
-    #     bash_command="dbt run --project-dir /opt/airflow/dbt",
-    # )
+    # ── Gold (dbt) ───────────────────────────────────────────
+    t_dbt_gold = BashOperator(
+        task_id="run_dbt_gold",
+        bash_command="cd /opt/airflow/dbt && dbt run --profiles-dir .",
+        env={
+            **os.environ, 
+            "MINIO_ACCESS_KEY": os.getenv("MINIO_ACCESS_KEY", "admin"),
+            "MINIO_SECRET_KEY": os.getenv("MINIO_SECRET_KEY", "12345678"),
+        }
+    )
 
     # ── Dependências ─────────────────────────────────────────
-    start_dag >> t_extract >> t_transform >> alert_task >> end_dag
+    start_dag >> t_extract >> t_transform >> t_dbt_gold >> alert_task >> end_dag

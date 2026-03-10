@@ -1,0 +1,12 @@
+name: 'basic_etl_project'
+version: '1.0.0'
+config-version: 2
+
+profile: 'basic_etl_project'
+
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages", "logs"]
+
+models:
+  basic_etl_project:
+    +materialized: table
