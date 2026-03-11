@@ -56,7 +56,7 @@ O projeto segue uma arquitetura de data lakehouse com camadas:
 
 3. **Execute os serviços**:
    ```bash
-   docker-compose up --build
+   docker compose up -d --build
    ```
 
 4. **Acesse as interfaces**:
@@ -177,7 +177,3 @@ python -m pytest
 ## Licença
 
 Este projeto está sob a licença MIT. Veja o arquivo LICENSE para mais detalhes.
-
-## Suporte
-
-Para dúvidas ou problemas, abra uma issue no GitHub ou entre em contato com a equipe de desenvolvimento.
