@@ -50,6 +50,7 @@ services:
       context: ./infra/airflow
       dockerfile: dockerfile
     container_name: airflow
+    user: "${HOST_UID:-1000}:0"
                              
     environment:
       AIRFLOW_HOME: /opt/airflow
