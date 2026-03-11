@@ -6,8 +6,8 @@ services:
       dockerfile: dockerfile
     container_name: rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: admin
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
       RABBITMQ_DEFAULT_VHOST: /
     ports:
       - "5672:5672"
@@ -31,6 +31,9 @@ services:
     environment:
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -50,6 +53,7 @@ services:
       context: ./infra/airflow
       dockerfile: dockerfile
     container_name: airflow
+    user: "${HOST_UID:-1000}:0"
                              
     environment:
       AIRFLOW_HOME: /opt/airflow
@@ -62,11 +66,15 @@ services:
       _AIRFLOW_WWW_USER_LASTNAME: User
       _AIRFLOW_WWW_USER_EMAIL: admin@example.com
       PYTHONPATH: /opt/airflow
+      # MinIO
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       # RabbitMQ
       ALERT_RMQ_HOST: rabbitmq
       ALERT_RMQ_PORT: "5672"
-      ALERT_RMQ_USER: admin
-      ALERT_RMQ_PASS: admin
+      ALERT_RMQ_USER: ${RABBITMQ_DEFAULT_USER}
+      ALERT_RMQ_PASS: ${RABBITMQ_DEFAULT_PASS}
       ALERT_RMQ_VHOST: /
       ALERT_EXCHANGE: alerts.exchange
       ALERT_QUEUE: alerts.email
@@ -113,8 +121,8 @@ services:
       PYTHONPATH: /opt/airflow
       ALERT_RMQ_HOST: rabbitmq
       ALERT_RMQ_PORT: "5672"
-      ALERT_RMQ_USER: admin
-      ALERT_RMQ_PASS: admin
+      ALERT_RMQ_USER: ${RABBITMQ_DEFAULT_USER}
+      ALERT_RMQ_PASS: ${RABBITMQ_DEFAULT_PASS}
       ALERT_RMQ_VHOST: /
       ALERT_EXCHANGE: alerts.exchange
       ALERT_QUEUE: alerts.email

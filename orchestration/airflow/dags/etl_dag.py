@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta
 import os
+
+from dotenv import load_dotenv
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.bash import BashOperator
-from airflow.utils.session import create_session
-from airflow.models import TaskInstance
-from airflow.utils.state import State
-from airflow.models import DagBag
+
+load_dotenv()
 
 
 from alerting.consumer.airflow_callback import airflow_task_failure_callback, airflow_pipeline_success_callback
@@ -52,7 +52,7 @@ with DAG(
     description="ETL: FakeStore API → Bronze → Silver → Gold (dbt)",
     default_args=default_args,
     start_date=datetime(2026, 3, 1),
-    schedule="@daily",
+    schedule_interval='30 10 * * *',
     catchup=False,
     tags=["etl", "fakestore"],
 ) as dag:
@@ -78,7 +78,6 @@ with DAG(
     
     end_dag = DummyOperator(task_id="end_dag")
     
-    # ── Gold (dbt) ───────────────────────────────────────────
     t_dbt_gold = BashOperator(
         task_id="run_dbt_gold",
         bash_command="cd /opt/airflow/dbt && dbt run --profiles-dir .",
@@ -89,5 +88,4 @@ with DAG(
         }
     )
 
-    # ── Dependências ─────────────────────────────────────────
     start_dag >> t_extract >> t_transform >> t_dbt_gold >> alert_task >> end_dag

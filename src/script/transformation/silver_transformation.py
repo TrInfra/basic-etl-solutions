@@ -2,15 +2,18 @@ import io
 import json
 import os
 
+from dotenv import load_dotenv
 import pandas as pd
 from minio import Minio
+
+load_dotenv()
 
 
 def get_minio_client() -> Minio:
     return Minio(
         os.getenv("MINIO_ENDPOINT", "minio:9000"),
-        access_key=os.getenv("MINIO_ACCESS_KEY", "admin"),
-        secret_key=os.getenv("MINIO_SECRET_KEY", "12345678"),
+        access_key=os.getenv("MINIO_ACCESS_KEY"),
+        secret_key=os.getenv("MINIO_SECRET_KEY"),
         secure=False,
     )
 

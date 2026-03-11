@@ -2,15 +2,18 @@ import json
 import os
 import time
 
+from dotenv import load_dotenv
 import pika
 
 from alerting.producer.email_notifier import EmailNotifier
 
+load_dotenv()
+
 
 RABBITMQ_HOST = os.getenv("ALERT_RMQ_HOST", "rabbitmq")
 RABBITMQ_PORT = int(os.getenv("ALERT_RMQ_PORT", "5672"))
-RABBITMQ_USER = os.getenv("ALERT_RMQ_USER", "admin")
-RABBITMQ_PASS = os.getenv("ALERT_RMQ_PASS", "admin")
+RABBITMQ_USER = os.getenv("ALERT_RMQ_USER")
+RABBITMQ_PASS = os.getenv("ALERT_RMQ_PASS")
 RABBITMQ_VHOST = os.getenv("ALERT_RMQ_VHOST", "/")
 
 ALERT_EXCHANGE = os.getenv("ALERT_EXCHANGE", "alerts.exchange")
