@@ -1,9 +1,13 @@
 from datetime import datetime, timedelta
 import os
+
+from dotenv import load_dotenv
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.bash import BashOperator
+
+load_dotenv()
 
 
 from alerting.consumer.airflow_callback import airflow_task_failure_callback, airflow_pipeline_success_callback
