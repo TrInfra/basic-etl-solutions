@@ -4,6 +4,16 @@
 
 Este projeto implementa uma solução ETL (Extract, Transform, Load) básica e completa, utilizando tecnologias modernas para processamento de dados. O pipeline extrai dados da API FakeStore, transforma-os em camadas (Bronze, Silver, Gold) e os armazena em um data lake baseado em MinIO. A orquestração é feita com Apache Airflow, e a camada Gold é gerenciada com DBT (Data Build Tool) usando DuckDB. Inclui sistema de alertas via RabbitMQ e email para monitoramento de falhas e sucessos.
 
+
+
+## Arquitetura
+![Buckets Bronze, Silver e Gold no MinIO](images/diagrama.png)
+O projeto segue uma arquitetura de data lakehouse com camadas:
+
+- **Bronze**: Dados brutos extraídos da API, armazenados como JSON no MinIO.
+- **Silver**: Dados transformados e limpos, salvos como CSV no MinIO.
+- **Gold**: Dados agregados e modelados, salvos como Parquet no MinIO via DBT.
+
 ### Funcionalidades Principais
 ![Grafo de execução do Airflow com tarefas com sucesso](images/dag_pipeline.png)
 - **Extração**: Dados de produtos, usuários e carrinhos da API FakeStore.
@@ -13,14 +23,6 @@ Este projeto implementa uma solução ETL (Extract, Transform, Load) básica e c
 - **Modelagem**: Camada Gold com DBT e DuckDB.
 - **Alertas**: Notificações por email em caso de falhas ou sucessos.
 - **Análises**: Notebook Jupyter para exploração de dados com DuckDB.
-
-## Arquitetura
-![Buckets Bronze, Silver e Gold no MinIO](images/Object_Storage.png)
-O projeto segue uma arquitetura de data lakehouse com camadas:
-
-- **Bronze**: Dados brutos extraídos da API, armazenados como JSON no MinIO.
-- **Silver**: Dados transformados e limpos, salvos como CSV no MinIO.
-- **Gold**: Dados agregados e modelados, salvos como Parquet no MinIO via DBT.
 
 ### Componentes
 - **RabbitMQ**: Mensageria para alertas.
@@ -125,15 +127,21 @@ from src.script.transformation.silver_transformation import transform_products
 transform_products()
 ```
 
-### Executar DBT
-```bash
-cd dbt
-dbt run --profiles-dir .
-```
-
 ### Análises no Notebook
 Abra `analytics/duckdb_analytics.ipynb` no Jupyter e execute as células para explorar os dados Gold.
-![Análise de dados da Camada Gold com DuckDB no Jupyter](images/dbt_analytics.png)
+
+```SQL
+
+SELECT 
+    category AS categoria,
+    COUNT(id) AS total_de_produtos,
+    ROUND(AVG(price), 2) AS preco_medio
+FROM silver_data
+GROUP BY category
+```
+
+![Análise de dados da Camada Gold com DuckDB no Jupyter](images/tabela_products.png)
+
 
 ## Configuração de Alertas
 ![Alerta de Sucesso/Falha recebido no E-mail](images/email_metadados.png)
@@ -143,28 +151,12 @@ Os alertas são enviados por email quando:
 
 Configure as variáveis SMTP no `.env` para habilitar.
 
-Para executar o consumidor de alertas separadamente:
-```bash
-docker-compose up alert-consumer
-```
-
-## Desenvolvimento
 
 ### Adicionar Novos Dados
 1. Adicione funções de extração em `src/script/extract/extraction.py`
 2. Crie transformações em `src/script/transformation/silver_transformation.py`
 3. Adicione modelos DBT em `dbt/models/`
 4. Atualize o DAG em `orchestration/airflow/dags/etl_dag.py`
-
-### Testes
-Execute testes locais com:
-```bash
-python -m pytest
-```
-
-### Logs
-- Airflow: `/opt/airflow/logs`
-- DBT: `dbt/logs`
 
 ## Contribuição
 
