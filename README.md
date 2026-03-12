@@ -49,11 +49,18 @@ O projeto segue uma arquitetura de data lakehouse com camadas:
 2. **Configure as variáveis de ambiente**:
    Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
    ```env
-   MINIO_ROOT_PASSWORD=your_minio_password
-   ALERT_SMTP_USER=your_gmail@gmail.com
-   ALERT_SMTP_PASS=your_gmail_app_password
-   ALERT_FROM_EMAIL=your_gmail@gmail.com
-   ALERT_TO_EMAIL=recipient@example.com
+   MINIO_ENDPOINT=localhost:9000
+   MINIO_ACCESS_KEY= seuacesskey
+   MINIO_SECRET_KEY= suasecretkey
+   MINIO_ROOT_PASSWORD= suasenharoot
+   
+   RABBITMQ_DEFAULT_USER=youruser
+   RABBITMQ_DEFAULT_PASS=yourpassword
+   
+   ALERT_SMTP_USER="seuemail@example.com"
+   ALERT_SMTP_PASS="senhadoapp"
+   ALERT_TO_EMAIL="email_destino@example.com"
+   ALERT_FROM_EMAIL="email_origem@example.com"
    ```
 
 3. **Execute os serviços**:
